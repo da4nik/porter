@@ -16,6 +16,8 @@ func main() {
   switch strings.ToLower(os.Args[1]) {
   case "cleanup":
     docker.Cleanup()
+  case "api":
+//    docker.CallApi("/images/json")
   }
 
   log.Println("Success")
