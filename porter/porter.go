@@ -38,7 +38,7 @@ func main() {
   case "cleanup":
     docker.Cleanup()
   case "run":
-    docker.RunContainer()
+    docker.Run()
   default :
     usage()
     os.Exit(1)

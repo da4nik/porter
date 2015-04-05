@@ -23,7 +23,7 @@ type ServiceConfig struct {
   Env string
 }
 
-func GetServiceConfig(serviceName string) kvItem {
+func GetServiceConfig(serviceName string) *ServiceConfig {
   resp, err := http.Get(consulUrl + getServiceConfigKey(serviceName))
   if err != nil {
     log.Fatal("Unable to get ", serviceName, " config. ", err)
@@ -31,6 +31,7 @@ func GetServiceConfig(serviceName string) kvItem {
 
   if resp.StatusCode != 200 {
     log.Printf("Config for service %s not found.\n", serviceName)
+    return nil
   }
 
   body, err := ioutil.ReadAll(resp.Body)
@@ -43,7 +44,10 @@ func GetServiceConfig(serviceName string) kvItem {
     log.Fatal("Unable to parse JSON. ", string(body))
   }
 
-  log.Println("PARSED", string(parsedJson[0].Value))
+  var serviceConfig ServiceConfig
+  if err := json.Unmarshal(parsedJson[0].Value, &serviceConfig); err != nil {
+    log.Fatal("Unable to parse service config. ", err)
+  }
 
-  return parsedJson[0]
+  return &serviceConfig
 }
