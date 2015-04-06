@@ -1,15 +1,13 @@
 package consul
 
 import (
-  "strings"
+	"strings"
 )
 
 const (
-  consulUrl = "http://localhost:8500/v1/kv/"
- )
+	consulUrl = "http://localhost:8500/v1/kv/"
+)
 
 func getServiceConfigKey(service string) string {
-  return strings.Join([]string{"services",  service, "config"}, "/")
+	return strings.Join([]string{"services", service, "config"}, "/")
 }
-
-
