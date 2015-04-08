@@ -19,8 +19,20 @@ func createContainer(serviceName string) {
 
 }
 
-func runContainer(serviceName string) {
+func startContainer(containerName string) {
 
+    req, err := http.NewRequest("POST", "http://localhost/containers/" + containerName + "/start", nil)
+    if err != nil {
+        log.Fatal("Unable to create request. ", err)
+    }
+    req.Header.Add("Content-type", "application/json")
+
+    client := getHttpClient()
+    resp, err := client.Do(req)
+    if err != nil {
+        log.Fatal("Unable to start container. ", err)
+    }
+    log.Println(resp)
 }
 
 func Run() {
@@ -33,6 +45,10 @@ func Run() {
 
     parameters := map[string]interface{}{
         "Image": serviceName,
+        "Env": serviceConfig.Env,
+        "HostConfig": map[string]interface{}{
+            "Binds": serviceConfig.Volumes,
+        },
     }
 
     if serviceConfig != nil {
@@ -62,4 +78,6 @@ func Run() {
     }
     log.Println(resp)
     log.Println(string(body))
+
+    startContainer(serviceName)
 }

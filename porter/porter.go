@@ -5,13 +5,10 @@ import (
 
     "github.com/da4nik/porter/consul"
     "github.com/da4nik/porter/docker"
-    "fmt"
 )
 
 func main() {
     parseParams()
-
-    fmt.Println("Action", Action)
 
     switch Action {
     case "cleanup":
