@@ -15,14 +15,14 @@ const (
 
 func removeEntity(path, id string, wg *sync.WaitGroup) {
     defer wg.Done()
-    deleteApiCall(path + id + "?force=1")
+    apiCall("DELETE", path + id, []string{"force=1",}, nil)
 }
 
 func removeContainersOrImages(queryPath, deletePath, messageTpl string) {
     var json []interface{}
     var wg sync.WaitGroup
 
-    json = getApiCall(queryPath)
+    json = jsonGetApiCall(queryPath)
     log.Printf(messageTpl, len(json))
 
     for i := 0; len(json) > 0 && i < len(json); i++ {

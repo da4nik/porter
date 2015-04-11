@@ -5,6 +5,7 @@ import (
     "fmt"
     "os"
     "github.com/da4nik/porter/utils"
+    "strings"
 )
 
 var (
@@ -48,7 +49,7 @@ func parseParams() {
         usage()
         os.Exit(1)
     }
-    Action = flag.Arg(0)
+    Action = strings.ToLower(flag.Arg(0))
 
     if result := utils.IsArrayIncludes(actionsWithService, Action); result != -1 {
         if flag.NArg() < 2 {
@@ -56,6 +57,6 @@ func parseParams() {
             usage()
             os.Exit(1)
         }
-        ServiceName = flag.Arg(1)
+        ServiceName = strings.ToLower(flag.Arg(1))
     }
 }

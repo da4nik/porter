@@ -7,13 +7,10 @@ import (
     "net"
     "net/http"
     "strings"
+    "bytes"
 )
 
 const dockerSocket = "/var/run/docker.sock"
-
-func getUrl(path string) string {
-    return strings.Join([]string{"http://localhost", path}, "")
-}
 
 func getHttpClient() http.Client {
     tr := &http.Transport{
@@ -25,31 +22,12 @@ func getHttpClient() http.Client {
     return http.Client{Transport: tr}
 }
 
-func callApi(path string) http.Response {
-    client := getHttpClient()
-    resp, err := client.Get(strings.Join([]string{"http://localhost", path}, ""))
+func jsonGetApiCall(path string) []interface{} {
+    resp, err := apiCall("GET", path, nil, nil)
     if err != nil {
-        log.Fatal("Unable to query API [", path, "]. Error=", err)
+        log.Fatal("Unable to complete GET request. ", err)
     }
 
-    return *resp
-}
-
-func deleteApiCall(path string) {
-    req, err := http.NewRequest("DELETE", getUrl(path), nil)
-    if err != nil {
-        log.Fatal("Unable to create request. ", err)
-    }
-
-    client := getHttpClient()
-    _, err = client.Do(req)
-    if err != nil {
-        log.Fatal("Unable to delete. ", err)
-    }
-}
-
-func getApiCall(path string) []interface{} {
-    resp := callApi(path)
     body, err := ioutil.ReadAll(resp.Body)
     if err != nil {
         log.Fatal("Unable to read request body. ", err)
@@ -63,4 +41,23 @@ func parseJson(data []byte) []interface{} {
         log.Fatal("Unable to parse ", string(data))
     }
     return parsedJson
+}
+
+func getApiUrl(path string, params []string) string {
+    var url_params string
+    if len(params) > 0 {
+        url_params = "?" + strings.Join(params, "&")
+    }
+    return strings.Join([]string{"http://localhost", path, url_params}, "")
+}
+
+func apiCall(method, path string, params []string, payload []byte) (resp *http.Response, error error) {
+    req, err := http.NewRequest(strings.ToUpper(method), getApiUrl(path, params), bytes.NewReader(payload))
+    if err != nil {
+        log.Fatal("Unable to create request. ", err)
+    }
+    req.Header.Add("Content-type", "application/json")
+
+    client := getHttpClient()
+    return client.Do(req)
 }
