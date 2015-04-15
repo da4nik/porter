@@ -17,6 +17,8 @@ func main() {
         docker.Run()
     case "addresses":
         consul.Addresses()
+    case "version":
+        Version()
     case "config":
         consul.Config()
     default:
