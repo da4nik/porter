@@ -15,6 +15,8 @@ func main() {
         docker.Cleanup()
     case "run":
         docker.Run()
+    case "addresses":
+        consul.Addresses()
     case "config":
         consul.Config()
     default:

@@ -23,6 +23,7 @@ var allActions  = []string{
 var actionsWithService = []string{
     "run",
     "config",
+    "addresses",
 }
 
 func usage() {
@@ -33,6 +34,7 @@ func usage() {
     commands := [][]string{
         {"cleanup", "Cleanup untagged images and exited containers."},
         {"run", "Run service container"},
+        {"addresses", "Prints all addresses for service in cluster"},
     }
 
     for _, command := range commands {

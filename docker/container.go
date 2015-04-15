@@ -2,10 +2,10 @@ package docker
 
 import (
     "log"
+    "fmt"
     "encoding/json"
 
     "github.com/da4nik/porter/consul"
-    "fmt"
 )
 
 const (
