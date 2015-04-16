@@ -11,5 +11,5 @@ Porter: docker container manager via consul config
 |--------|-------|-------------|
 |cleanup| | Removes images without names and containers with status Exited |
 |run | serviceName | Creates and runs container via consul config |
-
+|addresses | serviceName | Returns addresses where service deployed |
 

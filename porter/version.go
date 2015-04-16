@@ -8,5 +8,5 @@ import (
 const VERSION = "0.1.2"
 
 func Version() {
-    fmt.Fprintf(os.Stdout, "Porter version: %s\n", VERSION)
+    fmt.Fprintf(os.Stdout, "%s\n", VERSION)
 }
