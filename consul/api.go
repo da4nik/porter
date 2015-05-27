@@ -1,33 +1,55 @@
 package consul
 
 import (
-    "strings"
-    "net/http"
+    "errors"
+    "fmt"
+    "github.com/hashicorp/consul/api"
     "log"
-    "io/ioutil"
-)
-
-const (
-    urlConsul = "http://localhost:8500/v1"
 )
 
 func getServiceConfigKey(service string) string {
-    return strings.Join([]string{"services", service, "config"}, "/")
+    return fmt.Sprintf("service/%s/config", service)
 }
 
-func apiCall(path string) []byte {
-    resp, err := http.Get(urlConsul + path)
+func getClient() (client *api.Client, err error) {
+    config := api.DefaultConfig()
+    client, err = api.NewClient(config)
     if err != nil {
-        log.Fatal("Unable to get call consul api. ", err)
+        log.Fatal("Unable to connect to consul: ", err)
+        return
     }
+    return
+}
 
-    if resp.StatusCode != 200 {
-        log.Fatal("Consul API returned error.", resp.StatusCode)
-    }
-
-    body, err := ioutil.ReadAll(resp.Body)
+func getServices(serviceName string) (services []*api.CatalogService, err error) {
+    client, err := getClient()
     if err != nil {
-        log.Fatal("Unable to read config body. ", err)
+        return
     }
-    return body
+    catalog := client.Catalog()
+    services, _, err = catalog.Service(serviceName, "", nil)
+    if err != nil {
+        log.Fatal("Can't get services: ", err)
+        return
+    }
+    return
+}
+
+func getServiceConfig(serviceName string) (value []uint8, err error) {
+    client, err := getClient()
+    if err != nil {
+        return
+    }
+    kv := client.KV()
+    pair, _, err := kv.Get(getServiceConfigKey(serviceName), nil)
+    if err != nil {
+        log.Fatal("Can't get service config ", err)
+        return
+    }
+    if pair == nil {
+        err = errors.New(fmt.Sprint("No config for service ", serviceName))
+        return
+    }
+    value = pair.Value
+    return
 }

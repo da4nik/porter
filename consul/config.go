@@ -6,17 +6,6 @@ import (
     "log"
 )
 
-const pathConsulKV = "/kv/"
-
-type kvItem struct {
-    CreateIndex int
-    ModifyIndex int
-    LockIndex   int
-    Key         string
-    Flags       int
-    Value       []byte
-}
-
 type ServiceConfig struct {
     Volumes []string
     Ports   []string
@@ -24,19 +13,18 @@ type ServiceConfig struct {
 }
 
 func GetServiceConfig(serviceName string) *ServiceConfig {
-    body := apiCall(pathConsulKV + getServiceConfigKey(serviceName))
 
-    var parsedJson []kvItem
-    if err := json.Unmarshal(body, &parsedJson); err != nil {
-        log.Fatal("Unable to parse JSON. ", string(body))
+    serviceConfig := new(ServiceConfig)
+    value, err := getServiceConfig(serviceName)
+
+    if err != nil {
+        log.Fatal("Unable to get service config. ", err)
     }
-
-    var serviceConfig ServiceConfig
-    if err := json.Unmarshal(parsedJson[0].Value, &serviceConfig); err != nil {
+    if err := json.Unmarshal(value, serviceConfig); err != nil {
         log.Fatal("Unable to parse service config. ", err)
     }
 
-    return &serviceConfig
+    return serviceConfig
 }
 
 func Config() {
