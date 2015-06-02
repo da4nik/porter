@@ -3,18 +3,18 @@ package main
 import (
     "flag"
     "fmt"
-    "os"
     "github.com/da4nik/porter/utils"
+    "os"
     "strings"
 )
 
 var (
-    flDebug = *flag.Bool("D", false, "Set debug mode")
-    Action  string
+    flDebug     = *flag.Bool("D", false, "Set debug mode")
+    Action      string
     ServiceName string
 )
 
-var allActions  = []string{
+var allActions = []string{
     "cleanup",
     "run",
     "config",
@@ -35,6 +35,7 @@ func usage() {
         {"cleanup", "Cleanup untagged images and exited containers."},
         {"run", "Run service container"},
         {"addresses", "Prints all addresses for service in cluster"},
+        {"config", "Print service config"},
     }
 
     for _, command := range commands {
