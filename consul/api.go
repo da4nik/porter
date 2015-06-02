@@ -7,43 +7,42 @@ import (
     "log"
 )
 
-func getServiceConfigKey(service string) string {
-    return fmt.Sprintf("service/%s/config", service)
+type ConsulApi struct {
+    config *api.Config
+    client *api.Client
 }
 
-func getClient() (client *api.Client, err error) {
-    config := api.DefaultConfig()
-    client, err = api.NewClient(config)
+func NewApi() *ConsulApi {
+    var (
+        err error
+    )
+    c := new(ConsulApi)
+    c.config = api.DefaultConfig()
+    c.client, err = api.NewClient(c.config)
     if err != nil {
-        log.Fatal("Unable to connect to consul: ", err)
+        log.Fatal("Can't init consul client: ", err)
+    }
+    return c
+}
+
+func (c *ConsulApi) GetService(serviceName string) (service *api.CatalogService, err error) {
+    catalog := c.client.Catalog()
+    services, _, err := catalog.Service(serviceName, "", nil)
+    if err != nil {
         return
     }
+    if len(services) == 0 {
+        err = errors.New(fmt.Sprintf("Can't find service '%s'\n", serviceName))
+        return
+    }
+    service = services[0]
     return
 }
 
-func getServices(serviceName string) (services []*api.CatalogService, err error) {
-    client, err := getClient()
-    if err != nil {
-        return
-    }
-    catalog := client.Catalog()
-    services, _, err = catalog.Service(serviceName, "", nil)
-    if err != nil {
-        log.Fatal("Can't get services: ", err)
-        return
-    }
-    return
-}
-
-func getServiceConfig(serviceName string) (value []uint8, err error) {
-    client, err := getClient()
-    if err != nil {
-        return
-    }
-    kv := client.KV()
+func (c *ConsulApi) GetServiceConfig(serviceName string) (value []uint8, err error) {
+    kv := c.client.KV()
     pair, _, err := kv.Get(getServiceConfigKey(serviceName), nil)
     if err != nil {
-        log.Fatal("Can't get service config ", err)
         return
     }
     if pair == nil {
@@ -52,4 +51,8 @@ func getServiceConfig(serviceName string) (value []uint8, err error) {
     }
     value = pair.Value
     return
+}
+
+func getServiceConfigKey(service string) string {
+    return fmt.Sprintf("service/%s/config", service)
 }

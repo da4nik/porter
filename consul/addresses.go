@@ -12,11 +12,10 @@ func Addresses() {
     }
 
     serviceName := flag.Arg(1)
-    services, err := getServices(serviceName)
+    ca := NewApi()
+    service, err := ca.GetService(serviceName)
     if err != nil {
-        return
+        log.Fatal("Error get service: ", err)
     }
-    for _, service := range services {
-        fmt.Printf("%s:%d\n", service.Address, service.ServicePort)
-    }
+    fmt.Printf("%s:%d\n", service.Address, service.ServicePort)
 }

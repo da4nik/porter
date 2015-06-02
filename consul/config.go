@@ -15,7 +15,8 @@ type ServiceConfig struct {
 func GetServiceConfig(serviceName string) *ServiceConfig {
 
     serviceConfig := new(ServiceConfig)
-    value, err := getServiceConfig(serviceName)
+    ca := NewApi()
+    value, err := ca.GetServiceConfig(serviceName)
 
     if err != nil {
         log.Fatal("Unable to get service config. ", err)
