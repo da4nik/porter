@@ -1,21 +1,20 @@
 package docker
 
 import (
-    "log"
     "sync"
 )
 
 const (
-    pathUntaggedImages = "/images/json?filters={\"dangling\":[\"true\"]}"
-    pathExitedContainers = "/containers/json?all=1&filters={\"status\":[\"exited\"]}"
+    pathUntaggedImages   = `/images/json?filters={"dangling":["true"]}`
+    pathExitedContainers = `/containers/json?all=1&filters={"status":["exited"]}`
 
     pathRemoveContainers = "/containers/" // DELETE
-    pathRemoveImages = "/images/"     // DELETE
+    pathRemoveImages     = "/images/"     // DELETE
 )
 
 func removeEntity(path, id string, wg *sync.WaitGroup) {
     defer wg.Done()
-    apiCall("DELETE", path + id, []string{"force=1",}, nil)
+    apiCall("DELETE", path+id, query{"force": {"1"}}, nil)
 }
 
 func removeContainersOrImages(queryPath, deletePath, messageTpl string) {
@@ -23,7 +22,7 @@ func removeContainersOrImages(queryPath, deletePath, messageTpl string) {
     var wg sync.WaitGroup
 
     json = jsonGetApiCall(queryPath)
-    log.Printf(messageTpl, len(json))
+    logger.Printf(messageTpl, len(json))
 
     for i := 0; len(json) > 0 && i < len(json); i++ {
         container := json[i].(map[string]interface{})

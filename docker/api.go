@@ -1,14 +1,16 @@
 package docker
 
 import (
+    "bytes"
     "encoding/json"
     "io/ioutil"
-    "log"
     "net"
     "net/http"
+    "net/url"
     "strings"
-    "bytes"
 )
+
+type query map[string][]string
 
 const dockerSocket = "/var/run/docker.sock"
 
@@ -25,12 +27,12 @@ func getHttpClient() http.Client {
 func jsonGetApiCall(path string) []interface{} {
     resp, err := apiCall("GET", path, nil, nil)
     if err != nil {
-        log.Fatal("Unable to complete GET request. ", err)
+        logger.Fatal("Unable to complete GET request. ", err)
     }
 
     body, err := ioutil.ReadAll(resp.Body)
     if err != nil {
-        log.Fatal("Unable to read request body. ", err)
+        logger.Fatal("Unable to read request body. ", err)
     }
     return parseJson(body)
 }
@@ -38,26 +40,35 @@ func jsonGetApiCall(path string) []interface{} {
 func parseJson(data []byte) []interface{} {
     var parsedJson []interface{}
     if err := json.Unmarshal(data, &parsedJson); err != nil {
-        log.Fatal("Unable to parse ", string(data))
+        logger.Fatal("Unable to parse ", string(data))
     }
     return parsedJson
 }
 
-func getApiUrl(path string, params []string) string {
-    var url_params string
-    if len(params) > 0 {
-        url_params = "?" + strings.Join(params, "&")
+func getApiUrl(path string, params map[string][]string) (apiUrl string) {
+    apiUrl = "http://localhost" + path
+    u, err := url.Parse(apiUrl)
+    if err != nil {
+        logger.Fatal(err)
     }
-    return strings.Join([]string{"http://localhost", path, url_params}, "")
+    q := u.Query()
+    for k, vs := range params {
+        for _, v := range vs {
+            q.Set(k, v)
+        }
+    }
+    u.RawQuery = q.Encode()
+    apiUrl = u.String()
+    return
 }
 
-func apiCall(method, path string, params []string, payload []byte) (resp *http.Response, error error) {
+func apiCall(method, path string, params query, payload []byte) (resp *http.Response, error error) {
     req, err := http.NewRequest(strings.ToUpper(method), getApiUrl(path, params), bytes.NewReader(payload))
     if err != nil {
-        log.Fatal("Unable to create request. ", err)
+        logger.Fatal("Unable to create request. ", err)
     }
     req.Header.Add("Content-type", "application/json")
-
+    req.Header.Add("X-Registry-Auth", "0")
     client := getHttpClient()
     return client.Do(req)
 }

@@ -1,21 +1,10 @@
 package docker
 
-import (
-    "flag"
-    "log"
-)
+func Run(containerName, imageName, tag string, envs, volumes, ports []string) {
 
-
-func Run() {
-    if flag.Arg(1) == "" {
-        log.Fatal("No service name given")
-    }
-
-    serviceName := flag.Arg(1)
-
-    statusCode := createContainer(serviceName)
-    log.Println(statusCode)
-    statusCode = startContainer(serviceName)
-    log.Println(statusCode)
-    inspectContainer(serviceName)
+    statusCode := createContainer(containerName, imageName, tag, envs, volumes, ports)
+    logger.Printf("Create container '%s' (code: %d)\n", containerName, statusCode)
+    statusCode = startContainer(containerName)
+    logger.Printf("Start container '%s' (code: %d)\n", containerName, statusCode)
+    inspectContainer(containerName)
 }
