@@ -98,6 +98,12 @@ func main() {
         docker.Pull(*pullServiceName, *pullLastCommitId)
 
     case listen.FullCommand():
+        defer func() {
+            if r := recover(); r != nil {
+                log.Println("Recovered in panic", r)
+            }
+        }()
+        panic(1)
         consul.ProcessEvents(os.Stdin)
 
     default:
