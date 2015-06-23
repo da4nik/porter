@@ -3,6 +3,7 @@ package docker
 import (
     "encoding/json"
     "fmt"
+    "github.com/docker/docker/api/types"
     "github.com/docker/docker/nat"
     "github.com/docker/docker/runconfig"
     "io/ioutil"
@@ -87,10 +88,21 @@ func removeContainer(containerName string) int {
     return resp.StatusCode
 }
 
-func inspectContainer(containerName string) interface{} {
+func inspectContainer(containerName string) types.ContainerJSON {
+    var result types.ContainerJSON
     resp, err := apiCall("GET", fmt.Sprintf(pathInspectContainer, containerName), nil, nil)
     if err != nil {
         logger.Fatal("Unable to inspect container ", containerName, ". ", err)
     }
-    return resp
+    defer resp.Body.Close()
+    r := json.NewDecoder(resp.Body)
+    err = r.Decode(&result)
+    if err != nil {
+        logger.Fatal(err)
+    }
+    return result
+}
+
+func ContainerIsRunning(containerName string) bool {
+    return inspectContainer(containerName).State.Running
 }

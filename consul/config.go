@@ -70,7 +70,7 @@ func (s *ServiceConfig) getPorts() (map[nat.Port]struct{}, error) {
     return result, err
 }
 
-func (s *ServiceConfig) SeriveIds() (map[nat.Port]string, error) {
+func (s *ServiceConfig) SerivePorts() (map[nat.Port]string, error) {
     result := make(map[nat.Port]string)
     ports, err := s.getPorts()
     if err != nil {
@@ -83,11 +83,11 @@ func (s *ServiceConfig) SeriveIds() (map[nat.Port]string, error) {
 }
 
 func (s *ServiceConfig) Register() error {
-    ids, err := s.SeriveIds()
+    ports, err := s.SerivePorts()
     if err != nil {
         return err
     }
-    for port, id := range ids {
+    for port, id := range ports {
         err = api.registerService(s, id, port.Int())
         if err != nil {
             s.Deregister()
@@ -98,11 +98,11 @@ func (s *ServiceConfig) Register() error {
 }
 
 func (s *ServiceConfig) Deregister() error {
-    ids, err := s.SeriveIds()
+    ports, err := s.SerivePorts()
     if err != nil {
         return err
     }
-    for _, id := range ids {
+    for _, id := range ports {
         err = api.deregisterService(id)
         if err != nil {
             s.Deregister()

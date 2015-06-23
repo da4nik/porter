@@ -69,7 +69,7 @@ func TestRenameContainer(t *testing.T) {
     assert.True(containerExists(new_name))
     _ = id
     assert.Equal(id, containerId(new_name))
-    // assert.True(containerIsRunning(new_name))
+    assert.True(containerIsRunning(new_name))
 }
 
 func TestRemoveContainer(t *testing.T) {
@@ -81,4 +81,14 @@ func TestRemoveContainer(t *testing.T) {
     code := removeContainer(name)
     assert.Equal(204, code, "wrong code")
     assert.False(containerExists(name))
+}
+
+func TestInspectContainer(t *testing.T) {
+    assert := assert.New(t)
+    _ = assert
+    name := "test_container"
+    shRemoveContainer(name)
+    shRunContainer(name)
+    data := inspectContainer(name)
+    t.Logf("%#v", data.State.Running)
 }
