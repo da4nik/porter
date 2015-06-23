@@ -70,7 +70,7 @@ func (s *ServiceConfig) getPorts() (map[nat.Port]struct{}, error) {
     return result, err
 }
 
-func (s *ServiceConfig) SerivePorts() (map[nat.Port]string, error) {
+func (s *ServiceConfig) PortsInfo() (map[nat.Port]string, error) {
     result := make(map[nat.Port]string)
     ports, err := s.getPorts()
     if err != nil {
@@ -83,7 +83,7 @@ func (s *ServiceConfig) SerivePorts() (map[nat.Port]string, error) {
 }
 
 func (s *ServiceConfig) Register() error {
-    ports, err := s.SerivePorts()
+    ports, err := s.PortsInfo()
     if err != nil {
         return err
     }
@@ -98,7 +98,7 @@ func (s *ServiceConfig) Register() error {
 }
 
 func (s *ServiceConfig) Deregister() error {
-    ports, err := s.SerivePorts()
+    ports, err := s.PortsInfo()
     if err != nil {
         return err
     }
