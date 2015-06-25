@@ -2,7 +2,9 @@ package consul
 
 import (
     "encoding/json"
+    "errors"
     "fmt"
+    "github.com/da4nik/porter/docker"
     "github.com/docker/docker/nat"
     consulapi "github.com/hashicorp/consul/api"
     "net/url"
@@ -23,13 +25,13 @@ type ContainerConfig struct {
 }
 
 type ServiceConfig struct {
+    ContainerConfig
+
     Name       string
     LastCommit string
     Repo       string
     Token      string
-
-    ContainerConfig
-    *consulapi.KVPair
+    consulData *consulapi.KVPair
 }
 
 func (s *ServiceConfig) Key() string {
@@ -42,53 +44,35 @@ func (s *ServiceConfig) CloneUrl() (cu string, err error) {
         return
     }
     u.User = url.User(s.Token)
+    if len(s.LastCommit) > 0 {
+        u.Fragment = s.LastCommit
+    }
     cu = u.String()
     return
 }
 
 func (s *ServiceConfig) ContainerName() string {
-    // TODO: check for valid symbols
-    if s.LastCommit == "" {
-        return s.Name
-    }
-    return fmt.Sprintf("%s.%s", s.Name, s.LastCommit)
+    return s.Name
 }
 
 func (s *ServiceConfig) ImageName() string {
     return s.Name
 }
 
-func (s *ServiceConfig) getPorts() (map[nat.Port]struct{}, error) {
-    result := make(map[nat.Port]struct{})
-    ports, _, err := nat.ParsePortSpecs(s.Ports)
-    if err != nil {
-        return result, err
-    }
-    for port, data := range ports {
-        result[port] = data
-    }
-    return result, err
-}
-
-func (s *ServiceConfig) PortsInfo() (map[nat.Port]string, error) {
-    result := make(map[nat.Port]string)
-    ports, err := s.getPorts()
-    if err != nil {
-        return result, err
-    }
-    for port, _ := range ports {
-        result[port] = fmt.Sprintf("%s:%s", s.Name, port)
-    }
-    return result, err
+func (s *ServiceConfig) getPorts() (bindings map[nat.Port][]nat.PortBinding, err error) {
+    _, bindings, err = nat.ParsePortSpecs(s.Ports)
+    return
 }
 
 func (s *ServiceConfig) Register() error {
-    ports, err := s.PortsInfo()
-    if err != nil {
-        return err
+    var err error
+    if !docker.ContainerIsRunning(s.ContainerName()) {
+        return errors.New(fmt.Sprintf("Container '%s' isn't running\n", s.ContainerName()))
     }
-    for port, id := range ports {
-        err = api.registerService(s, id, port.Int())
+    portMap := docker.ContainerPorts(s.Name)
+    for intPort, hostPort := range portMap {
+        serviceId := fmt.Sprintf("%s:%s", s.Name, intPort)
+        err = api.registerService(s.Name, serviceId, hostPort)
         if err != nil {
             s.Deregister()
             return err
@@ -98,23 +82,24 @@ func (s *ServiceConfig) Register() error {
 }
 
 func (s *ServiceConfig) Deregister() error {
-    ports, err := s.PortsInfo()
+    services, err := api.listAgentServices()
     if err != nil {
         return err
     }
-    for _, id := range ports {
-        err = api.deregisterService(id)
-        if err != nil {
-            s.Deregister()
-            return err
+    for id, service := range services {
+        if service.Service == s.Name {
+            err = api.deregisterService(id)
+            if err != nil {
+                return err
+            }
         }
     }
     return nil
 }
 
 func (s *ServiceConfig) Update() error {
-    s.KVPair = new(consulapi.KVPair)
-    pair := s.KVPair
+    s.consulData = new(consulapi.KVPair)
+    pair := s.consulData
     pair.Key = s.Key()
     value, err := json.Marshal(s)
     if err != nil {
@@ -122,6 +107,10 @@ func (s *ServiceConfig) Update() error {
     }
     pair.Value = value
     return api.PutKVPair(pair)
+}
+
+func (s *ServiceConfig) Delete() error {
+    return api.DeleteKvPair(s.Key())
 }
 
 func GetServiceConfig(serviceName string) (serviceConfig *ServiceConfig, err error) {
@@ -135,8 +124,8 @@ func GetServiceConfig(serviceName string) (serviceConfig *ServiceConfig, err err
         err = NoConfigError{serviceName, serviceConfig.Key()}
         return
     }
-    serviceConfig.KVPair = pair
-    if err = json.Unmarshal(serviceConfig.Value, &(serviceConfig)); err != nil {
+    serviceConfig.consulData = pair
+    if err = json.Unmarshal(serviceConfig.consulData.Value, &(serviceConfig)); err != nil {
         return
     }
 

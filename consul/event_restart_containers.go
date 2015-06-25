@@ -25,14 +25,16 @@ func (h *RestartContainersHandler) Handle() error {
     if err != nil {
         return err
     }
-    old_name := c.Name + "_old"
+    old_name := c.ContainerName() + "_old"
     c.Deregister()
-    docker.Rename(c.Name, old_name)
+    docker.Rename(c.ContainerName(), old_name)
+    docker.Stop(old_name)
     docker.Run(c.ContainerName(), c.ImageName(), c.LastCommit, c.Env, c.Volumes, c.Ports)
     <-time.After(10 * time.Second)
     if !docker.ContainerIsRunning(c.ContainerName()) {
         docker.Remove(c.ContainerName())
         docker.Rename(old_name, c.ContainerName())
+        docker.Start(old_name)
         return StartContainerError("New container isn't started normally")
     }
     c.Register()
@@ -40,6 +42,6 @@ func (h *RestartContainersHandler) Handle() error {
     return nil
 }
 
-type NoneHandler struct {
-    event *Event
+func NewRestartContainerEvent(serviceName, nodeFilter, serviceFilter string) Event {
+    return newEvent(RestartContainersEventName, serviceName, nodeFilter, serviceFilter)
 }

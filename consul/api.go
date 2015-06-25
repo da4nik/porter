@@ -4,6 +4,8 @@ import (
     "errors"
     "fmt"
     consulapi "github.com/hashicorp/consul/api"
+    "strconv"
+    "time"
 )
 
 type NotUpdatedError struct {
@@ -37,6 +39,10 @@ func GetApi() *ConsulApi {
 
     }
     return api
+}
+
+func (c *ConsulApi) Client() *consulapi.Client {
+    return c.client
 }
 
 func (c *ConsulApi) GetService(serviceName string) (service *consulapi.CatalogService, err error) {
@@ -80,11 +86,22 @@ func (c *ConsulApi) PutKVPair(pair *consulapi.KVPair) error {
     return err
 }
 
-func (c *ConsulApi) registerService(service *ServiceConfig, serviceID string, servicePort int) error {
+func (c *ConsulApi) DeleteKvPair(key string) error {
+    _, err := c.client.KV().Delete(key, nil)
+    return err
+}
+
+func (c *ConsulApi) registerService(serviceName, serviceID, serviceHostPort string) error {
     registration := new(consulapi.AgentServiceRegistration)
     registration.ID = serviceID
-    registration.Name = service.Name
-    registration.Port = servicePort
+    registration.Name = serviceName
+    port, _ := strconv.Atoi(serviceHostPort)
+    registration.Port = port
+    agent, err := c.client.Agent().Self()
+    if err != nil {
+        return err
+    }
+    registration.Address = agent["Member"]["Addr"].(string)
     return c.client.Agent().ServiceRegister(registration)
 }
 
@@ -92,11 +109,39 @@ func (c *ConsulApi) deregisterService(serviceID string) error {
     return c.client.Agent().ServiceDeregister(serviceID)
 }
 
+func (c *ConsulApi) listAgentServices() (map[string]*consulapi.AgentService, error) {
+    return c.Client().Agent().Services()
+}
+
 func (c *ConsulApi) FireEvent(params *Event) (result string, err error) {
     event := c.client.Event()
     result, _, err = event.Fire(&params.UserEvent, new(consulapi.WriteOptions))
     if err != nil {
         return
+    }
+    return
+}
+
+func (c *ConsulApi) ListEvents(waitIndex uint64) (events []*consulapi.UserEvent, lastIndex uint64, err error) {
+    var (
+        meta *consulapi.QueryMeta
+    )
+    e := c.client.Event()
+    q := &consulapi.QueryOptions{
+        WaitIndex: waitIndex,
+        WaitTime:  15 * time.Second,
+    }
+    events, meta, err = e.List("", q)
+    if err != nil {
+        return
+    }
+    lastIndex = meta.LastIndex
+    // only new events
+    for i := 0; i < len(events); i++ {
+        if e.IDToIndex(events[i].ID) == waitIndex {
+            events = events[i+1:]
+            break
+        }
     }
     return
 }

@@ -2,7 +2,6 @@ package consul
 
 import (
     "github.com/da4nik/porter/docker"
-    consulapi "github.com/hashicorp/consul/api"
 )
 
 const (
@@ -22,16 +21,14 @@ func (h *BuildImageHandler) Handle() error {
     if err != nil {
         return err
     }
-    docker.Build(c.ImageName(), cloneUrl)
-    restartEvent := Event{
-        consulapi.UserEvent{
-            Name: RestartContainersEventName,
-        },
-    }
+    err = docker.Build(c.ImageName(), cloneUrl)
     if err != nil {
         return err
     }
-    restartEvent.SetServiceName(c.Name)
-    restartEvent.ServiceFilter = h.event.ServiceFilter
+    restartEvent := NewRestartContainerEvent(c.Name, h.event.NodeFilter, h.event.ServiceFilter)
     return restartEvent.Fire()
+}
+
+func NewBuildImageEvent(serviceName, nodeFilter, serviceFilter string) Event {
+    return newEvent(BuildImageEventName, serviceName, nodeFilter, serviceFilter)
 }

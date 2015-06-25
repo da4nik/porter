@@ -106,3 +106,12 @@ func inspectContainer(containerName string) types.ContainerJSON {
 func ContainerIsRunning(containerName string) bool {
     return inspectContainer(containerName).State.Running
 }
+
+func ContainerPorts(containerName string) map[string]string {
+    var result = make(map[string]string)
+    data := inspectContainer(containerName)
+    for internalPort, mapping := range data.NetworkSettings.Ports {
+        result[internalPort.Port()] = mapping[0].HostPort
+    }
+    return result
+}
