@@ -10,6 +10,10 @@ import (
     "net/url"
 )
 
+const (
+    configPrefix = "service"
+)
+
 type NoConfigError struct {
     name, key string
 }
@@ -35,7 +39,7 @@ type ServiceConfig struct {
 }
 
 func (s *ServiceConfig) Key() string {
-    return fmt.Sprintf("service/%s/config", s.Name)
+    return fmt.Sprintf("%s/%s/config", configPrefix, s.Name)
 }
 
 func (s *ServiceConfig) CloneUrl() (cu string, err error) {
@@ -113,22 +117,27 @@ func (s *ServiceConfig) Delete() error {
     return api.DeleteKvPair(s.Key())
 }
 
+func (s *ServiceConfig) fillFromKV(pair *consulapi.KVPair) error {
+    if pair == nil {
+        err := NoConfigError{s.Name, s.Key()}
+        return err
+    }
+    s.consulData = pair
+    if err := json.Unmarshal(s.consulData.Value, s); err != nil {
+        return err
+    }
+    return nil
+}
+
 func GetServiceConfig(serviceName string) (serviceConfig *ServiceConfig, err error) {
+    var pair *consulapi.KVPair
     serviceConfig = new(ServiceConfig)
     serviceConfig.Name = serviceName
-    pair, err := api.GetKVPair(serviceConfig.Key())
+    pair, err = api.GetKVPair(serviceConfig.Key())
     if err != nil {
         return
     }
-    if pair == nil {
-        err = NoConfigError{serviceName, serviceConfig.Key()}
-        return
-    }
-    serviceConfig.consulData = pair
-    if err = json.Unmarshal(serviceConfig.consulData.Value, &(serviceConfig)); err != nil {
-        return
-    }
-
+    err = serviceConfig.fillFromKV(pair)
     return
 }
 
@@ -148,6 +157,23 @@ func UpdateServiceConfig(serviceName string, repo *url.URL, token *string) error
         config.Token = *token
     }
     return config.Update()
+}
+
+func ListConfigs() (configList []*ServiceConfig, err error) {
+    var pairs consulapi.KVPairs
+    pairs, _, err = api.Client().KV().List(configPrefix, nil)
+    if err != nil {
+        return
+    }
+    for _, pair := range pairs {
+        config := new(ServiceConfig)
+        err = config.fillFromKV(pair)
+        if err != nil {
+            return
+        }
+        configList = append(configList, config)
+    }
+    return
 }
 
 func Config(serviceName string) {
