@@ -1,13 +1,16 @@
 package consul
 
 import (
-    "encoding/json"
     consulapi "github.com/hashicorp/consul/api"
-    "io"
+    "time"
 )
 
 type Handler interface {
     Handle() error
+}
+
+type NoneHandler struct {
+    event *Event
 }
 
 func (h *NoneHandler) Handle() error {
@@ -50,21 +53,51 @@ func (e *Event) GetHandler() (h Handler) {
     return
 }
 
-func ProcessEvents(r io.Reader) {
-    var (
-        list []Event
-    )
-    d := json.NewDecoder(r)
-    err := d.Decode(&list)
-    if err != nil {
-        logger.Println(err)
-        return
+func newEvent(eventName, serviceName, nodeFilter, serviceFilter string) Event {
+    event := Event{
+        consulapi.UserEvent{
+            Name:          eventName,
+            ServiceFilter: serviceFilter,
+            NodeFilter:    nodeFilter,
+        },
     }
-    for _, e := range list {
-        logger.Printf("Process event '%s' (payload '%s')\n", e.Name, e.Payload)
-        err = e.GetHandler().Handle()
+    event.SetServiceName(serviceName)
+    return event
+}
+
+func ListenEvents() {
+    const (
+        startRetryTime = 5 * time.Second
+        maxRetryTime   = 3 * time.Minute
+    )
+    var (
+        events    []*consulapi.UserEvent
+        lastIndex uint64
+        err       error
+        retryTime = startRetryTime
+    )
+    for {
+        events, lastIndex, err = api.ListEvents(lastIndex)
         if err != nil {
-            logger.Println(err)
+            logger.Print(err)
+            logger.Println("Retry after", retryTime)
+            <-time.After(retryTime)
+            retryTime *= 2
+            if retryTime > maxRetryTime {
+                retryTime = maxRetryTime
+            }
+            continue
+        }
+        retryTime = startRetryTime
+        for _, ue := range events {
+            event := Event{
+                UserEvent: *ue,
+            }
+            logger.Printf("Start event '%s'\n", event.Name)
+            err = event.GetHandler().Handle()
+            if err != nil {
+                logger.Println(err)
+            }
         }
     }
 }

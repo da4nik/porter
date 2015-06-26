@@ -8,5 +8,5 @@ import (
 var logger *log.Logger
 
 func init() {
-    logger = log.New(os.Stdout, "docker: ", log.Lshortfile)
+    logger = log.New(os.Stdout, "[docker] ", log.Lshortfile|log.LstdFlags)
 }
