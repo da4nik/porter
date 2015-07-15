@@ -8,14 +8,6 @@ import (
     "time"
 )
 
-type NotUpdatedError struct {
-    key string
-}
-
-func (e NotUpdatedError) Error() string {
-    return fmt.Sprintf("Record '%s' already chaged", e.key)
-}
-
 var api *ConsulApi
 
 type ConsulApi struct {

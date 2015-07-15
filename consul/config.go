@@ -1,190 +1,62 @@
 package consul
 
 import (
-    "encoding/json"
-    "errors"
     "fmt"
-    "github.com/da4nik/porter/docker"
-    "github.com/docker/docker/nat"
     consulapi "github.com/hashicorp/consul/api"
-    "net/url"
 )
 
-const (
-    configPrefix = "service"
-)
+type NotUpdatedError struct {
+    key string
+}
+
+func (e NotUpdatedError) Error() string {
+    return fmt.Sprintf("Record '%s' already chaged", e.key)
+}
 
 type NoConfigError struct {
-    name, key string
+    key string
 }
 
 func (e NoConfigError) Error() string {
-    return fmt.Sprintf("No config for service %s (key %s)\n", e.name, e.key)
+    return fmt.Sprintf("No config for key %s\n", e.key)
 }
 
-type ContainerConfig struct {
-    Volumes []string
-    Ports   []string
-    Env     []string
+type Config interface {
+    serialize() ([]byte, error)
+    deserialize([]byte) error
+    Key() string
+    SetModifyIndex(uint64)
+    GetModifyIndex() uint64
 }
 
-type ServiceConfig struct {
-    ContainerConfig
-
-    Name        string
-    LastCommit  string
-    Repo        string
-    Token       string
-    ModifyIndex uint64
-    consulData  *consulapi.KVPair
-}
-
-func (s *ServiceConfig) Key() string {
-    return fmt.Sprintf("%s/%s/config", configPrefix, s.Name)
-}
-
-func (s *ServiceConfig) CloneUrl() (cu string, err error) {
-    u, err := url.Parse(s.Repo)
-    if err != nil {
-        return
-    }
-    u.User = url.User(s.Token)
-    if len(s.LastCommit) > 0 {
-        u.Fragment = s.LastCommit
-    }
-    cu = u.String()
-    return
-}
-
-func (s *ServiceConfig) ContainerName() string {
-    return s.Name
-}
-
-func (s *ServiceConfig) ImageName() string {
-    return s.Name
-}
-
-func (s *ServiceConfig) getPorts() (bindings map[nat.Port][]nat.PortBinding, err error) {
-    _, bindings, err = nat.ParsePortSpecs(s.Ports)
-    return
-}
-
-func (s *ServiceConfig) Register() error {
-    var err error
-    if !docker.ContainerIsRunning(s.ContainerName()) {
-        return errors.New(fmt.Sprintf("Container '%s' isn't running\n", s.ContainerName()))
-    }
-    portMap := docker.ContainerPorts(s.Name)
-    for intPort, hostPort := range portMap {
-        serviceId := fmt.Sprintf("%s:%s", s.Name, intPort)
-        err = api.registerService(s.Name, serviceId, hostPort)
-        if err != nil {
-            s.Deregister()
-            return err
-        }
-    }
-    return nil
-}
-
-func (s *ServiceConfig) Deregister() error {
-    services, err := api.listAgentServices()
+func LoadConfig(c Config) error {
+    pair, err := api.GetKVPair(c.Key())
     if err != nil {
         return err
     }
-    for id, service := range services {
-        if service.Service == s.Name {
-            err = api.deregisterService(id)
-            if err != nil {
-                return err
-            }
-        }
-    }
-    return nil
+    return fillFromKV(c, pair)
 }
 
-func (s *ServiceConfig) Update() error {
-    s.consulData = new(consulapi.KVPair)
-    s.consulData.Key = s.Key()
-    s.consulData.ModifyIndex = s.ModifyIndex
-    value, err := json.Marshal(s)
-    if err != nil {
-        return err
-    }
-    s.consulData.Value = value
-    return api.PutKVPair(s.consulData)
-}
-
-func (s *ServiceConfig) Delete() error {
-    return api.DeleteKvPair(s.Key())
-}
-
-func (s *ServiceConfig) fillFromKV(pair *consulapi.KVPair) error {
+func fillFromKV(c Config, pair *consulapi.KVPair) error {
     if pair == nil {
-        err := NoConfigError{s.Name, s.Key()}
+        return NoConfigError{c.Key()}
+    }
+    c.SetModifyIndex(pair.ModifyIndex)
+    return c.deserialize(pair.Value)
+}
+
+func SaveConfig(c Config) error {
+    pair := new(consulapi.KVPair)
+    pair.Key = c.Key()
+    pair.ModifyIndex = c.GetModifyIndex()
+    value, err := c.serialize()
+    if err != nil {
         return err
     }
-    s.consulData = pair
-    s.ModifyIndex = s.consulData.ModifyIndex
-    if err := json.Unmarshal(s.consulData.Value, s); err != nil {
-        return err
-    }
-    return nil
+    pair.Value = value
+    return api.PutKVPair(pair)
 }
 
-func GetServiceConfig(serviceName string) (serviceConfig *ServiceConfig, err error) {
-    var pair *consulapi.KVPair
-    serviceConfig = new(ServiceConfig)
-    serviceConfig.Name = serviceName
-    pair, err = api.GetKVPair(serviceConfig.Key())
-    if err != nil {
-        return
-    }
-    err = serviceConfig.fillFromKV(pair)
-    return
-}
-
-func UpdateServiceConfig(serviceName string, repo *url.URL, token *string) error {
-    config, err := GetServiceConfig(serviceName)
-    if err != nil {
-        if _, ok := err.(NoConfigError); !ok {
-            return err
-        }
-        config = new(ServiceConfig)
-        config.Name = serviceName
-    }
-    if repo != nil {
-        config.Repo = repo.String()
-    }
-    if token != nil {
-        config.Token = *token
-    }
-    return config.Update()
-}
-
-func ListConfigs() (configList []*ServiceConfig, err error) {
-    var pairs consulapi.KVPairs
-    pairs, _, err = api.Client().KV().List(configPrefix, nil)
-    if err != nil {
-        return
-    }
-    for _, pair := range pairs {
-        config := new(ServiceConfig)
-        err = config.fillFromKV(pair)
-        if err != nil {
-            return
-        }
-        configList = append(configList, config)
-    }
-    return
-}
-
-func Config(serviceName string) {
-    serviceConfig, err := GetServiceConfig(serviceName)
-    if err != nil {
-        logger.Fatal(err)
-    }
-    logger.Println(serviceConfig)
-    logger.Println("Volumes: ", serviceConfig.Volumes)
-    logger.Println("Ports: ", serviceConfig.Ports)
-    logger.Println("Env: ", serviceConfig.Env)
+func DeleteConfig(c Config) error {
+    return api.DeleteKvPair(c.Key())
 }
