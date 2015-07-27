@@ -78,7 +78,14 @@ func main() {
         consul.Addresses(*addressServiceName)
 
     case config.FullCommand():
-        consul.Config(*configServiceName)
+        serviceConfig, err := consul.GetServiceConfig(*configServiceName)
+        if err != nil {
+            log.Fatal(err)
+        }
+        log.Println(serviceConfig)
+        log.Println("Volumes: ", serviceConfig.Volumes)
+        log.Println("Ports: ", serviceConfig.Ports)
+        log.Println("Env: ", serviceConfig.Env)
 
     case setConfig.FullCommand():
         consul.UpdateServiceConfig(*setConfigServiceName, *setConfigRepo, setConfigToken)
