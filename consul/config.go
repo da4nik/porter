@@ -31,11 +31,12 @@ type ContainerConfig struct {
 type ServiceConfig struct {
     ContainerConfig
 
-    Name       string
-    LastCommit string
-    Repo       string
-    Token      string
-    consulData *consulapi.KVPair
+    Name        string
+    LastCommit  string
+    Repo        string
+    Token       string
+    ModifyIndex uint64
+    consulData  *consulapi.KVPair
 }
 
 func (s *ServiceConfig) Key() string {
@@ -103,14 +104,14 @@ func (s *ServiceConfig) Deregister() error {
 
 func (s *ServiceConfig) Update() error {
     s.consulData = new(consulapi.KVPair)
-    pair := s.consulData
-    pair.Key = s.Key()
+    s.consulData.Key = s.Key()
+    s.consulData.ModifyIndex = s.ModifyIndex
     value, err := json.Marshal(s)
     if err != nil {
         return err
     }
-    pair.Value = value
-    return api.PutKVPair(pair)
+    s.consulData.Value = value
+    return api.PutKVPair(s.consulData)
 }
 
 func (s *ServiceConfig) Delete() error {
@@ -123,6 +124,7 @@ func (s *ServiceConfig) fillFromKV(pair *consulapi.KVPair) error {
         return err
     }
     s.consulData = pair
+    s.ModifyIndex = s.consulData.ModifyIndex
     if err := json.Unmarshal(s.consulData.Value, s); err != nil {
         return err
     }
